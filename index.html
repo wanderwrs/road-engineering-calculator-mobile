@@ -677,7 +677,7 @@ function exportRecordPdf(id){
   if(r)exportPdf(r.data,r.result,r);
 }
 
-/* ===== PDF 导出 ===== */
+/* ===== PDF 导出（统一格式） ===== */
 const DISCLAIMER=`声明与免责：
 1. 本计算器仅供道路与桥梁工程技术专业学习、教学及工程现场快速参考使用，不构成正式检测报告。
 2. 计算结果依据公开试验方法与常规公式整理，实际工程应以现行国家标准、行业规范及法定检测机构出具的报告为准。
@@ -685,87 +685,220 @@ const DISCLAIMER=`声明与免责：
 4. 因输入数据错误或公式理解偏差导致的结果偏差，由使用者自行承担。
 5. 引用开源库：jsPDF (MIT License)、Font Awesome (CC BY 4.0)。`;
 
+// 字段 key -> 中文标签 映射（从计算器配置中查找，找不到则用 key）
+function getFieldLabel(calcId,key){
+  const c=CALCULATORS.find(x=>x.id===calcId);
+  if(!c)return key;
+  const f=c.fields.find(x=>x.key===key);
+  return f?f.label:key;
+}
+function getFieldUnit(calcId,key){
+  const c=CALCULATORS.find(x=>x.id===calcId);
+  if(!c)return '';
+  const f=c.fields.find(x=>x.key===key);
+  return f&&f.unit?f.unit:'';
+}
+function getCalcDesc(calcId){
+  const c=CALCULATORS.find(x=>x.id===calcId);
+  return c?c.desc:'';
+}
+
+// 画统一表格
+function drawTable(doc,rows,colWidths,x,y,rowH,headerColor){
+  const total=colWidths.reduce((a,b)=>a+b,0);
+  // 表头
+  doc.setFillColor(headerColor[0],headerColor[1],headerColor[2]);
+  doc.rect(x,y,total,rowH,'F');
+  doc.setTextColor(255,255,255);
+  doc.setFont('helvetica','bold');
+  doc.setFontSize(9.5);
+  let cx=x;
+  rows[0].forEach((cell,i)=>{
+    doc.text(String(cell),cx+6,y+rowH/2+3.5);
+    cx+=colWidths[i];
+  });
+  y+=rowH;
+  // 数据行
+  doc.setFont('helvetica','normal');
+  doc.setFontSize(9.5);
+  for(let r=1;r<rows.length;r++){
+    doc.setFillColor(r%2===0?248:255, r%2===0?250:255, r%2===0?252:255);
+    doc.rect(x,y,total,rowH,'F');
+    doc.setDrawColor(229,233,242);
+    doc.rect(x,y,total,rowH,'S');
+    doc.setTextColor(30,41,59);
+    cx=x;
+    rows[r].forEach((cell,i)=>{
+      if(i===rows[r].length-1 && r>0){doc.setFont('helvetica','bold');doc.setTextColor(37,99,235);}
+      else{doc.setFont('helvetica','normal');doc.setTextColor(30,41,59);}
+      doc.text(String(cell),cx+6,y+rowH/2+3.5);
+      cx+=colWidths[i];
+    });
+    y+=rowH;
+  }
+  // 外框
+  doc.setDrawColor(200,206,218);
+  doc.rect(x,y-rowH*rows.length,total,rowH*rows.length,'S');
+  return y;
+}
+
 function exportPdf(data,result,record){
   const {jsPDF}=window.jspdf;
   const doc=new jsPDF({unit:'pt',format:'a4'});
+  const pageW=doc.internal.pageSize.getWidth();
+  const margin=48;
+  const usableW=pageW-margin*2;
   const c=currentCalc;
+  const calcId=record?record.calcId:c.id;
   const name=record?record.calcName:c.name;
   const cat=record?record.cat:c.cat;
   const time=record?record.time:new Date().toLocaleString('zh-CN');
+  const reportNo='REC-'+Date.now().toString().slice(-8);
 
-  // 标题
+  /* ===== 统一页眉 ===== */
+  // 蓝色标题栏
   doc.setFillColor(37,99,235);
-  doc.rect(0,0,doc.internal.pageSize.getWidth(),70,'F');
+  doc.rect(0,0,pageW,64,'F');
   doc.setTextColor(255,255,255);
   doc.setFont('helvetica','bold');
-  doc.setFontSize(18);
-  doc.text('Road Engineering Calculator',40,32);
-  doc.setFontSize(13);
-  doc.text(name+'  -  '+cat,40,54);
+  doc.setFontSize(16);
+  doc.text('道路工程计算器 · 计算报告',margin,30);
+  doc.setFont('helvetica','normal');
+  doc.setFontSize(11);
+  doc.text(`Road Engineering Calculator - Calculation Report`,margin,48);
+  // 右侧计算器信息
+  doc.setFontSize(10);
+  doc.text(`${name}  |  ${cat}`,pageW-margin,30,{align:'right'});
+  doc.text(`报告编号: ${reportNo}`,pageW-margin,48,{align:'right'});
 
-  let y=100;
+  /* ===== 报告元信息 ===== */
+  let y=92;
+  doc.setFillColor(241,245,249);
+  doc.rect(margin,y,usableW,46,'F');
+  doc.setDrawColor(229,233,242);
+  doc.rect(margin,y,usableW,46,'S');
   doc.setTextColor(30,41,59);
+  doc.setFont('helvetica','bold');
+  doc.setFontSize(10);
+  doc.text('报告信息',margin+12,y+16);
+  doc.setFont('helvetica','normal');
+  doc.setFontSize(9.5);
+  doc.text(`生成时间: ${time}`,margin+12,y+34);
+  doc.text(`计算器: ${name}`,margin+220,y+34);
+  doc.text(`类别: ${cat}`,margin+400,y+34);
+  y+=66;
+
+  /* ===== 1. 输入参数表 ===== */
+  doc.setTextColor(37,99,235);
   doc.setFont('helvetica','bold');
   doc.setFontSize(12);
-  doc.text('Calculation Report / 计算报告',40,y); y+=8;
-  doc.setFont('helvetica','normal');
-  doc.setFontSize(9);
-  doc.setTextColor(100,116,139);
-  doc.text('Generated at / 生成时间: '+time,40,y); y+=20;
+  doc.text('一、输入参数 / Input Parameters',margin,y); y+=6;
+  doc.setDrawColor(37,99,235);
+  doc.setLineWidth(1.5);
+  doc.line(margin,y,margin+60,y);
+  doc.setLineWidth(0.5);
+  y+=14;
 
-  // 输入参数
-  doc.setTextColor(30,41,59);
-  doc.setFont('helvetica','bold');
-  doc.setFontSize(11);
-  doc.text('Input Parameters / 输入参数',40,y); y+=16;
-  doc.setFont('helvetica','normal');
-  doc.setFontSize(10);
-  doc.setDrawColor(229,233,242);
-  doc.line(40,y,doc.internal.pageSize.getWidth()-40,y); y+=10;
+  const inputRows=[['序号','参数名称','数值','单位']];
+  let idx=1;
   Object.entries(data).forEach(([k,v])=>{
-    if(y>720){doc.addPage();y=60;}
-    doc.setTextColor(100,116,139);
-    doc.text(k,60,y);
-    doc.setTextColor(30,41,59);
-    doc.text(String(v),300,y);
-    y+=18;
+    inputRows.push([String(idx),getFieldLabel(calcId,k),String(v),getFieldUnit(calcId,k)||'-']);
+    idx++;
   });
+  y=drawTable(doc,inputRows,[50,usableW*0.45,usableW*0.3,usableW*0.25-50],margin,y,26,[37,99,235]);
 
-  y+=10;
-  doc.setTextColor(30,41,59);
+  /* ===== 2. 计算结果表 ===== */
+  y+=18;
+  doc.setTextColor(37,99,235);
   doc.setFont('helvetica','bold');
-  doc.setFontSize(11);
-  doc.text('Results / 计算结果',40,y); y+=16;
-  doc.setFont('helvetica','normal');
-  doc.setFontSize(10);
-  doc.line(40,y,doc.internal.pageSize.getWidth()-40,y); y+=10;
+  doc.setFontSize(12);
+  doc.text('二、计算结果 / Calculation Results',margin,y); y+=6;
+  doc.setDrawColor(37,99,235);
+  doc.setLineWidth(1.5);
+  doc.line(margin,y,margin+60,y);
+  doc.setLineWidth(0.5);
+  y+=14;
+
+  const resultRows=[['序号','项目','结果','单位/状态']];
+  idx=1;
   Object.entries(result).forEach(([k,v])=>{
-    if(y>720){doc.addPage();y=60;}
-    doc.setTextColor(100,116,139);
-    doc.text(k,60,y);
+    resultRows.push([String(idx),k,String(v.v),v.u||'']);
+    idx++;
+  });
+  y=drawTable(doc,resultRows,[50,usableW*0.4,usableW*0.35,usableW*0.25-50],margin,y,26,[16,185,129]);
+
+  /* ===== 3. 计算公式说明 ===== */
+  const desc=getCalcDesc(calcId);
+  if(desc){
+    y+=18;
+    if(y>620){doc.addPage();y=80;drawPageHeader(doc,pageW);}
     doc.setTextColor(37,99,235);
     doc.setFont('helvetica','bold');
-    doc.text(`${v.v} ${v.u||''}`,300,y);
+    doc.setFontSize(12);
+    doc.text('三、计算公式说明 / Formula Reference',margin,y); y+=6;
+    doc.setDrawColor(37,99,235);
+    doc.setLineWidth(1.5);
+    doc.line(margin,y,margin+60,y);
+    doc.setLineWidth(0.5);
+    y+=14;
+    doc.setFillColor(241,245,249);
+    doc.rect(margin,y,usableW,48,'F');
+    doc.setDrawColor(229,233,242);
+    doc.rect(margin,y,usableW,48,'S');
+    doc.setTextColor(60,72,88);
     doc.setFont('helvetica','normal');
-    y+=18;
-  });
+    doc.setFontSize(9.5);
+    const descLines=doc.splitTextToSize(desc,usableW-24);
+    descLines.forEach((l,i)=>{ doc.text(l,margin+12,y+18+i*13); });
+    y+=66;
+  }
 
-  // 声明
-  y+=20;
-  doc.setTextColor(100,116,139);
+  /* ===== 4. 声明与免责 ===== */
+  if(y>560){doc.addPage();y=80;}
+  doc.setTextColor(239,68,68);
   doc.setFont('helvetica','bold');
-  doc.setFontSize(10);
-  doc.text('Disclaimer / 声明',40,y); y+=14;
+  doc.setFontSize(11);
+  doc.text('声明与免责 / Disclaimer',margin,y); y+=6;
+  doc.setDrawColor(239,68,68);
+  doc.setLineWidth(1.5);
+  doc.line(margin,y,margin+60,y);
+  doc.setLineWidth(0.5);
+  y+=14;
+  doc.setTextColor(100,116,139);
   doc.setFont('helvetica','normal');
   doc.setFontSize(8.5);
-  const lines=doc.splitTextToSize(DISCLAIMER,doc.internal.pageSize.getWidth()-80);
-  lines.forEach(l=>{
-    if(y>760){doc.addPage();y=60;}
-    doc.text(l,40,y); y+=12;
+  const discLines=doc.splitTextToSize(DISCLAIMER,usableW);
+  discLines.forEach(l=>{
+    if(y>760){doc.addPage();y=80;}
+    doc.text(l,margin,y); y+=12;
   });
 
-  doc.save(`calc_${name}_${Date.now()}.pdf`);
+  /* ===== 页脚（所有页） ===== */
+  const totalPages=doc.internal.getNumberOfPages();
+  for(let p=1;p<=totalPages;p++){
+    doc.setPage(p);
+    doc.setDrawColor(229,233,242);
+    doc.setLineWidth(0.5);
+    doc.line(margin,790,pageW-margin,790);
+    doc.setTextColor(148,163,184);
+    doc.setFont('helvetica','normal');
+    doc.setFontSize(8);
+    doc.text('道路工程计算器 · 移动版  |  数据本地保存，仅供学习参考',margin,802);
+    doc.text(`第 ${p} / ${totalPages} 页`,pageW-margin,802,{align:'right'});
+  }
+
+  doc.save(`计算报告_${name}_${reportNo}.pdf`);
   toast('PDF 已导出');
+}
+
+// 新增页的小页眉（非首页）
+function drawPageHeader(doc,pageW){
+  doc.setFillColor(37,99,235);
+  doc.rect(0,0,pageW,40,'F');
+  doc.setTextColor(255,255,255);
+  doc.setFont('helvetica','bold');
+  doc.setFontSize(11);
+  doc.text('道路工程计算器 · 计算报告',48,26);
 }
 
 /* ===== 关于 ===== */
