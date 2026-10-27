@@ -38,6 +38,12 @@ python -m http.server 8000
 
 或直接双击 `index.html` 打开。
 
+## PDF 导出
+
+导出的 PDF 采用统一报告格式：页眉（应用名 / 计算器 / 报告编号）、报告信息、输入参数表、计算结果表、计算公式说明、声明与免责、页脚页码。表格超长时自动分页并重复表头。
+
+PDF 中文显示依赖内嵌字体 `pdf-font.js`（Noto Sans SC 子集，约 225KB，SIL Open Font License 1.1），无需联网即可正确渲染中文，不会出现乱码。
+
 ## 声明与免责
 
 1. 本计算器仅供学习、教学及工程现场快速参考使用，不构成正式检测报告。
@@ -47,4 +53,4 @@ python -m http.server 8000
 
 ## 许可
 
-仅供学习与非盈利使用。
+仅供学习与非盈利使用。内嵌字体 Noto Sans SC 遵循 SIL Open Font License 1.1。
