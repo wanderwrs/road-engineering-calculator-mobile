@@ -1,0 +1,811 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#2563eb">
+<title>道路工程计算器 · 移动版</title>
+<meta name="description" content="道路与桥梁工程专业计算器移动版，支持本地记录与PDF导出">
+<link rel="manifest" href="manifest.json">
+<link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<style>
+/* ===== 基础与主题变量 ===== */
+:root{
+  --primary:#2563eb; --primary-dark:#1d4ed8; --primary-light:#dbeafe;
+  --bg:#f5f7fb; --card:#ffffff; --text:#1e293b; --text-2:#64748b;
+  --border:#e5e9f2; --input:#f1f5f9; --success:#10b981; --warn:#f59e0b; --danger:#ef4444;
+  --sidebar-w:260px; --radius:14px; --shadow:0 4px 16px rgba(15,23,42,.06);
+}
+.dark{
+  --primary:#3b82f6; --primary-dark:#2563eb; --primary-light:#1e3a8a;
+  --bg:#0b1220; --card:#131c2e; --text:#e2e8f0; --text-2:#94a3b8;
+  --border:#243049; --input:#1b2538; --success:#34d399; --warn:#fbbf24; --danger:#f87171;
+  --shadow:0 4px 16px rgba(0,0,0,.4);
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%}
+body{
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+  background:var(--bg);color:var(--text);transition:background .3s,color .3s;
+  font-size:15px;line-height:1.5;
+}
+button{font-family:inherit;cursor:pointer}
+input,select{font-family:inherit}
+
+/* ===== 侧边栏 ===== */
+.sidebar{
+  position:fixed;top:0;left:0;height:100vh;width:var(--sidebar-w);
+  background:var(--card);border-right:1px solid var(--border);
+  display:flex;flex-direction:column;z-index:50;
+  transform:translateX(0);transition:transform .3s ease;
+}
+.sidebar.closed{transform:translateX(-100%)}
+.brand{
+  padding:18px 18px 14px;border-bottom:1px solid var(--border);
+  display:flex;align-items:center;gap:10px;
+}
+.brand .logo{
+  width:38px;height:38px;border-radius:10px;
+  background:linear-gradient(135deg,var(--primary),#7c3aed);
+  display:flex;align-items:center;justify-content:center;color:#fff;font-size:20px;
+}
+.brand h1{font-size:16px;font-weight:700}
+.brand p{font-size:11px;color:var(--text-2)}
+.nav-scroll{flex:1;overflow-y:auto;padding:10px 10px}
+.cat{margin-bottom:6px}
+.cat-title{
+  font-size:11px;color:var(--text-2);font-weight:600;
+  padding:8px 10px 6px;text-transform:uppercase;letter-spacing:.5px;
+}
+.nav-item{
+  display:flex;align-items:center;gap:10px;
+  padding:10px 12px;border-radius:10px;color:var(--text);
+  text-decoration:none;font-size:14px;transition:all .15s;
+}
+.nav-item:hover{background:var(--input)}
+.nav-item.active{background:var(--primary-light);color:var(--primary);font-weight:600}
+.nav-item .ico{width:20px;text-align:center;font-size:14px}
+.sidebar-footer{padding:12px;border-top:1px solid var(--border);font-size:11px;color:var(--text-2);text-align:center}
+
+/* ===== 主区域 ===== */
+.main{margin-left:var(--sidebar-w);min-height:100vh;transition:margin-left .3s}
+.main.full{margin-left:0}
+.topbar{
+  position:sticky;top:0;z-index:40;
+  background:var(--card);border-bottom:1px solid var(--border);
+  padding:12px 16px;display:flex;align-items:center;gap:12px;
+}
+.menu-btn{
+  background:none;border:none;color:var(--text);font-size:20px;padding:6px;
+  display:none;
+}
+.topbar-title{font-size:16px;font-weight:600;flex:1}
+.topbar-actions{display:flex;gap:6px}
+.icon-btn{
+  width:38px;height:38px;border-radius:10px;border:1px solid var(--border);
+  background:var(--card);color:var(--text);display:flex;align-items:center;justify-content:center;
+  transition:all .15s;
+}
+.icon-btn:hover{background:var(--input)}
+.content{padding:16px;max-width:860px;margin:0 auto}
+
+/* ===== 卡片 ===== */
+.card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden}
+.card-hd{padding:16px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.card-hd h2{font-size:17px;font-weight:700;display:flex;align-items:center;gap:8px}
+.card-hd .tag{font-size:11px;padding:3px 10px;border-radius:999px;background:var(--primary-light);color:var(--primary);font-weight:600}
+.card-bd{padding:18px}
+.desc{font-size:13px;color:var(--text-2);margin-bottom:16px;line-height:1.6}
+
+/* ===== 表单 ===== */
+.field{margin-bottom:14px}
+.field label{display:block;font-size:13px;font-weight:500;margin-bottom:6px;color:var(--text)}
+.field input,.field select{
+  width:100%;padding:12px 14px;border:1px solid var(--border);border-radius:10px;
+  background:var(--input);color:var(--text);font-size:15px;transition:all .15s;
+}
+.field input:focus,.field select:focus{outline:none;border-color:var(--primary);box-shadow:0 0 0 3px rgba(37,99,235,.15)}
+.field .unit{font-size:12px;color:var(--text-2);font-weight:400}
+.field .hint{font-size:11px;color:var(--text-2);margin-top:4px}
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media(max-width:520px){.grid-2{grid-template-columns:1fr}}
+
+.btn{
+  padding:12px 18px;border:none;border-radius:10px;font-size:15px;font-weight:600;
+  display:inline-flex;align-items:center;justify-content:center;gap:8px;transition:all .15s;
+}
+.btn-primary{background:var(--primary);color:#fff}
+.btn-primary:hover{background:var(--primary-dark)}
+.btn-ghost{background:var(--input);color:var(--text)}
+.btn-ghost:hover{background:var(--border)}
+.btn-success{background:var(--success);color:#fff}
+.btn-row{display:flex;gap:10px;margin-top:18px}
+.btn-row .btn{flex:1}
+
+/* ===== 结果区 ===== */
+.result-box{
+  margin-top:18px;background:var(--input);border-radius:12px;padding:16px;
+  display:none;
+}
+.result-box.show{display:block;animation:fadeUp .3s ease}
+@keyframes fadeUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+.result-item{
+  display:flex;justify-content:space-between;align-items:center;
+  padding:10px 0;border-bottom:1px solid var(--border);
+}
+.result-item:last-child{border-bottom:none}
+.result-label{font-size:13px;color:var(--text-2)}
+.result-val{font-size:16px;font-weight:700;color:var(--primary)}
+.result-val small{font-size:11px;color:var(--text-2);font-weight:400}
+.status-pill{font-size:12px;padding:3px 10px;border-radius:999px;font-weight:600}
+.status-ok{background:rgba(16,185,129,.12);color:var(--success)}
+.status-warn{background:rgba(245,158,11,.12);color:var(--warn)}
+.status-err{background:rgba(239,68,68,.12);color:var(--danger)}
+
+/* ===== 记录列表 ===== */
+.record-item{
+  background:var(--card);border:1px solid var(--border);border-radius:12px;
+  padding:14px;margin-bottom:10px;transition:all .15s;
+}
+.record-item:hover{box-shadow:var(--shadow)}
+.record-hd{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px}
+.record-name{font-weight:600;font-size:14px}
+.record-time{font-size:11px;color:var(--text-2)}
+.record-data{font-size:12px;color:var(--text-2);line-height:1.7}
+.record-actions{display:flex;gap:8px;margin-top:10px}
+.record-actions button{font-size:12px;padding:6px 12px;border-radius:8px;border:1px solid var(--border);background:var(--input);color:var(--text)}
+.record-actions button:hover{background:var(--border)}
+.record-actions .del{color:var(--danger)}
+.empty{text-align:center;padding:40px 20px;color:var(--text-2)}
+.empty i{font-size:40px;margin-bottom:12px;opacity:.4}
+
+/* ===== 覆盖层(移动端侧边栏) ===== */
+.overlay{
+  position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:45;
+  display:none;
+}
+.overlay.show{display:block}
+
+/* ===== 提示 ===== */
+.toast{
+  position:fixed;bottom:20px;left:50%;transform:translateX(-50%) translateY(100px);
+  background:var(--card);color:var(--text);padding:12px 20px;border-radius:10px;
+  box-shadow:var(--shadow);z-index:100;font-size:14px;transition:transform .3s;
+  border:1px solid var(--border);max-width:90vw;
+}
+.toast.show{transform:translateX(-50%) translateY(0)}
+
+/* ===== 移动端适配 ===== */
+@media(max-width:768px){
+  .sidebar{transform:translateX(-100%)}
+  .sidebar.open{transform:translateX(0)}
+  .main{margin-left:0}
+  .menu-btn{display:block}
+  .content{padding:12px}
+  .card-bd{padding:14px}
+}
+</style>
+</head>
+<body>
+
+<!-- 侧边栏 -->
+<aside class="sidebar closed" id="sidebar">
+  <div class="brand">
+    <div class="logo"><i class="fa fa-calculator"></i></div>
+    <div>
+      <h1>道路工程计算器</h1>
+      <p>移动版 · v1.0</p>
+    </div>
+  </div>
+  <div class="nav-scroll" id="navList"></div>
+  <div class="sidebar-footer">
+    仅供学习与工程参考<br>数据本地保存
+  </div>
+</aside>
+<div class="overlay" id="overlay"></div>
+
+<!-- 主区域 -->
+<div class="main full" id="main">
+  <div class="topbar">
+    <button class="menu-btn" id="menuBtn"><i class="fa fa-bars"></i></button>
+    <div class="topbar-title" id="topbarTitle">道路工程计算器</div>
+    <div class="topbar-actions">
+      <button class="icon-btn" id="themeBtn" title="切换主题"><i class="fa fa-moon-o"></i></button>
+      <button class="icon-btn" id="recordsBtn" title="计算记录"><i class="fa fa-history"></i></button>
+    </div>
+  </div>
+  <div class="content" id="content"></div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ============================================================
+   计算器配置：每个计算器定义输入字段、计算函数、输出字段
+   ============================================================ */
+const CALCULATORS = [
+  // ===== 砂石材料类 =====
+  {
+    id:'sand-density', cat:'砂石材料', name:'砂子堆积密度', icon:'fa-cubes',
+    desc:'计算砂子松散/密集堆积密度及孔隙率。堆积密度 = (总质量-筒质量)/容积；孔隙率 = (1 - 堆积密度/砂密度)×100%。',
+    fields:[
+      {key:'cW',label:'容量筒质量',unit:'g',type:'number',min:0},
+      {key:'tW',label:'容量筒+砂总质量',unit:'g',type:'number',min:0},
+      {key:'vol',label:'容量筒容积',unit:'cm³',type:'number',min:0,def:1000},
+      {key:'rho',label:'砂的表观密度',unit:'g/cm³',type:'number',min:0,def:2.65,step:0.01},
+    ],
+    calc:(d)=>{
+      const bulk=(d.tW-d.cW)/d.vol;
+      const porosity=(1-bulk/d.rho)*100;
+      return {
+        '堆积密度':{v:bulk.toFixed(3),u:'g/cm³'},
+        '孔隙率':{v:porosity.toFixed(1),u:'%'},
+      };
+    }
+  },
+  {
+    id:'sand-sieve', cat:'砂石材料', name:'砂筛分实验', icon:'fa-filter',
+    desc:'计算各筛的分计筛余百分率与累计筛余百分率，评定砂的颗粒级配。',
+    fields:[
+      {key:'total',label:'试样总质量',unit:'g',type:'number',min:0},
+      {key:'s475',label:'4.75mm 筛余',unit:'g',type:'number',min:0,def:0},
+      {key:'s236',label:'2.36mm 筛余',unit:'g',type:'number',min:0,def:0},
+      {key:'s118',label:'1.18mm 筛余',unit:'g',type:'number',min:0,def:0},
+      {key:'s600',label:'0.60mm 筛余',unit:'g',type:'number',min:0,def:0},
+      {key:'s300',label:'0.30mm 筛余',unit:'g',type:'number',min:0,def:0},
+      {key:'s150',label:'0.15mm 筛余',unit:'g',type:'number',min:0,def:0},
+      {key:'bottom',label:'底盘筛余',unit:'g',type:'number',min:0,def:0},
+    ],
+    calc:(d)=>{
+      const items=[
+        ['4.75mm',d.s475],['2.36mm',d.s236],['1.18mm',d.s118],
+        ['0.60mm',d.s600],['0.30mm',d.s300],['0.15mm',d.s150],['底盘',d.bottom],
+      ];
+      let cum=0; const out={};
+      items.forEach(([k,m])=>{
+        const part=(m/d.total)*100;
+        cum+=part;
+        out[`${k} 分计筛余`]={v:part.toFixed(2),u:'%'};
+        out[`${k} 累计筛余`]={v:cum.toFixed(2),u:'%'};
+      });
+      out['筛分损耗']={v:(100-cum).toFixed(2),u:'%'};
+      return out;
+    }
+  },
+  {
+    id:'needle-flat', cat:'砂石材料', name:'石子针片状', icon:'fa-random',
+    desc:'计算石子针状、片状颗粒含量及总针片状含量，并给出合格评定。',
+    fields:[
+      {key:'total',label:'样品总质量',unit:'g',type:'number',min:0},
+      {key:'needle',label:'针状颗粒质量',unit:'g',type:'number',min:0},
+      {key:'flat',label:'片状颗粒质量',unit:'g',type:'number',min:0},
+    ],
+    calc:(d)=>{
+      const n=(d.needle/d.total)*100;
+      const f=(d.flat/d.total)*100;
+      const t=n+f;
+      let status,cls;
+      if(t<=5){status='合格 (≤5%)';cls='status-ok'}
+      else if(t<=10){status='可用 (5%~10%)';cls='status-warn'}
+      else{status='不合格 (>10%)';cls='status-err'}
+      return {
+        '针状颗粒含量':{v:n.toFixed(2),u:'%'},
+        '片状颗粒含量':{v:f.toFixed(2),u:'%'},
+        '总针片状含量':{v:t.toFixed(2),u:'%'},
+        '结果评定':{v:status,cls:cls},
+      };
+    }
+  },
+  // ===== 水泥实验类 =====
+  {
+    id:'cement-fineness', cat:'水泥实验', name:'水泥细度', icon:'fa-sitemap',
+    desc:'筛析法测定水泥细度，计算80μm/45μm筛余百分率及修正后筛余。筛余% = 筛余物质量/水泥质量×100%。',
+    fields:[
+      {key:'cMass',label:'水泥试样质量',unit:'g',type:'number',min:0},
+      {key:'r80',label:'80μm 筛余物质量',unit:'g',type:'number',min:0},
+      {key:'f80',label:'80μm 修正系数',unit:'',type:'number',min:0,def:1,step:0.01},
+      {key:'r45',label:'45μm 筛余物质量',unit:'g',type:'number',min:0,def:0},
+      {key:'f45',label:'45μm 修正系数',unit:'',type:'number',min:0,def:1,step:0.01},
+    ],
+    calc:(d)=>{
+      const p80=(d.r80/d.cMass)*100;
+      const cp80=p80*d.f80;
+      const out={
+        '80μm 筛余百分率':{v:p80.toFixed(2),u:'%'},
+        '80μm 修正后筛余':{v:cp80.toFixed(2),u:'%'},
+      };
+      if(d.r45>0){
+        const p45=(d.r45/d.cMass)*100;
+        out['45μm 筛余百分率']={v:p45.toFixed(2),u:'%'};
+        out['45μm 修正后筛余']={v:(p45*d.f45).toFixed(2),u:'%'};
+      }
+      return out;
+    }
+  },
+  {
+    id:'cement-consistency', cat:'水泥实验', name:'水泥标准稠度用水量', icon:'fa-tint',
+    desc:'计算水泥标准稠度用水量百分比，并依据试杆距底板距离评定净浆稠度状态。',
+    fields:[
+      {key:'cMass',label:'水泥质量',unit:'g',type:'number',min:0,def:500},
+      {key:'wMass',label:'用水量',unit:'g',type:'number',min:0},
+      {key:'dist',label:'试杆距底板距离',unit:'mm',type:'number',min:0,def:0},
+    ],
+    calc:(d)=>{
+      const p=(d.wMass/d.cMass)*100;
+      let status,cls;
+      if(d.dist>=5&&d.dist<=7){status='标准稠度 (5~7mm)';cls='status-ok'}
+      else if(d.dist<5){status='过干 (<5mm)';cls='status-warn'}
+      else{status='过稀 (>7mm)';cls='status-warn'}
+      return {
+        '标准稠度用水量':{v:p.toFixed(2),u:'%'},
+        '试杆距底板距离':{v:d.dist.toFixed(1),u:'mm'},
+        '稠度状态':{v:status,cls:cls},
+      };
+    }
+  },
+  {
+    id:'cement-strength', cat:'水泥实验', name:'水泥胶砂强度', icon:'fa-shield',
+    desc:'按GB公式计算抗折与抗压强度。抗折强度 = 3F/(2bh²) (b=h=40mm)；抗压强度 = F/A (A=1600mm²)。',
+    fields:[
+      {key:'fLoad',label:'抗折极限载荷',unit:'kN',type:'number',min:0},
+      {key:'cLoad',label:'抗压极限载荷',unit:'kN',type:'number',min:0},
+    ],
+    calc:(d)=>{
+      const b=40,h=40,A=b*h;
+      const flexural=(3*d.fLoad*1000)/(2*b*h*h); // kN转N
+      const compressive=(d.cLoad*1000)/A;
+      return {
+        '抗折强度':{v:flexural.toFixed(2),u:'MPa'},
+        '抗压强度':{v:compressive.toFixed(2),u:'MPa'},
+      };
+    }
+  },
+  // ===== 混凝土配合比类 =====
+  {
+    id:'water-cement', cat:'混凝土配合比', name:'水灰比', icon:'fa-balance-scale',
+    desc:'计算混凝土水灰比(W/C)与灰水比(C/W)，以及已知目标水灰比反求材料用量。',
+    fields:[
+      {key:'water',label:'水的用量',unit:'kg/m³',type:'number',min:0},
+      {key:'cement',label:'水泥的用量',unit:'kg/m³',type:'number',min:0},
+    ],
+    calc:(d)=>{
+      const wc=d.water/d.cement;
+      const cw=d.cement/d.water;
+      return {
+        '水灰比 W/C':{v:wc.toFixed(3),u:''},
+        '灰水比 C/W':{v:cw.toFixed(3),u:''},
+        '总用量':{v:(d.water+d.cement).toFixed(1),u:'kg/m³'},
+      };
+    }
+  },
+  {
+    id:'concrete-slump', cat:'混凝土配合比', name:'混凝土坍落度', icon:'fa-building',
+    desc:'由每立方米材料用量计算20kg试验用量、配合比(以水泥为1)、水灰比及砂率。',
+    fields:[
+      {key:'cement',label:'水泥',unit:'kg/m³',type:'number',min:0},
+      {key:'sand',label:'砂子',unit:'kg/m³',type:'number',min:0},
+      {key:'stone',label:'石子',unit:'kg/m³',type:'number',min:0},
+      {key:'water',label:'水',unit:'kg/m³',type:'number',min:0},
+      {key:'adm',label:'外加剂',unit:'kg/m³',type:'number',min:0,def:0},
+    ],
+    calc:(d)=>{
+      const total=d.cement+d.sand+d.stone+d.water+d.adm;
+      const ratio=20/total;
+      const sr=(d.sand/(d.sand+d.stone))*100;
+      const wc=d.water/d.cement;
+      return {
+        '20kg试验-水泥':{v:(d.cement*ratio).toFixed(2),u:'kg'},
+        '20kg试验-砂子':{v:(d.sand*ratio).toFixed(2),u:'kg'},
+        '20kg试验-石子':{v:(d.stone*ratio).toFixed(2),u:'kg'},
+        '20kg试验-水':{v:(d.water*ratio).toFixed(2),u:'kg'},
+        '配合比 水泥:砂:石:水':{v:`1.00 : ${(d.sand/d.cement).toFixed(2)} : ${(d.stone/d.cement).toFixed(2)} : ${(d.water/d.cement).toFixed(2)}`,u:''},
+        '水灰比':{v:wc.toFixed(2),u:''},
+        '砂率':{v:sr.toFixed(1),u:'%'},
+      };
+    }
+  },
+  {
+    id:'cement-sand', cat:'混凝土配合比', name:'灰砂比', icon:'fa-flask',
+    desc:'计算水泥与砂的质量比，或根据目标灰砂比与砂浆总量分配水泥、砂用量。灰砂比 = 水泥质量/砂质量。',
+    fields:[
+      {key:'mode',label:'计算模式',type:'select',options:[['ratio','已知质量求灰砂比'],['target','已知灰砂比求用量']]},
+      {key:'cement',label:'水泥质量',unit:'g',type:'number',min:0,def:0},
+      {key:'sand',label:'砂质量',unit:'g',type:'number',min:0,def:0},
+      {key:'ratio',label:'目标灰砂比',unit:'',type:'number',min:0,def:0,step:0.01},
+      {key:'total',label:'目标砂浆总量',unit:'g',type:'number',min:0,def:0},
+    ],
+    calc:(d)=>{
+      if(d.mode==='ratio'){
+        const r=d.cement/d.sand;
+        return {'灰砂比':{v:r.toFixed(3),u:''},'水泥:砂':{v:`${r.toFixed(3)} : 1`,u:''}};
+      }else{
+        const sand=d.total/(1+d.ratio);
+        const cement=d.total-sand;
+        return {
+          '水泥用量':{v:cement.toFixed(1),u:'g'},
+          '砂用量':{v:sand.toFixed(1),u:'g'},
+          '灰砂比':{v:d.ratio.toFixed(3),u:''},
+        };
+      }
+    }
+  },
+  // ===== 通用工具类 =====
+  {
+    id:'angle-dms', cat:'通用工具', name:'度分秒计算', icon:'fa-compass',
+    desc:'角度的度分秒(DMS)格式加减运算，自动进位与借位。',
+    fields:[
+      {key:'d1',label:'角度1-度',unit:'°',type:'number',def:0},
+      {key:'m1',label:'角度1-分',unit:'′',type:'number',min:0,max:59,def:0},
+      {key:'s1',label:'角度1-秒',unit:'″',type:'number',min:0,max:59,def:0},
+      {key:'op',label:'运算',type:'select',options:[['+','加法 +'],['-','减法 -']]},
+      {key:'d2',label:'角度2-度',unit:'°',type:'number',def:0},
+      {key:'m2',label:'角度2-分',unit:'′',type:'number',min:0,max:59,def:0},
+      {key:'s2',label:'角度2-秒',unit:'″',type:'number',min:0,max:59,def:0},
+    ],
+    calc:(d)=>{
+      const toSec=(de,mi,se)=>de*3600+mi*60+se;
+      let t=toSec(d.d1,d.m1,d.s1)+(d.op==='+'?1:-1)*toSec(d.d2,d.m2,d.s2);
+      const neg=t<0; if(neg)t=-t;
+      const deg=Math.floor(t/3600); t%=3600;
+      const m=Math.floor(t/60); const s=t%60;
+      const str=(neg?'-':'')+`${deg}°${m}′${s.toFixed(1)}″`;
+      const dec=(neg?-1:1)*(deg+m/60+s/3600);
+      return {
+        '结果(DMS)':{v:str,u:''},
+        '结果(十进制度)':{v:dec.toFixed(5),u:'°'},
+      };
+    }
+  },
+];
+
+/* ============================================================
+   状态与 DOM 引用
+   ============================================================ */
+const $=id=>document.getElementById(id);
+const sidebar=$('sidebar'), main=$('main'), overlay=$('overlay');
+let currentCalc=null;
+
+/* ===== 主题 ===== */
+function applyTheme(){
+  const dark=localStorage.getItem('theme')==='dark';
+  document.documentElement.classList.toggle('dark',dark);
+  $('themeBtn').innerHTML=dark?'<i class="fa fa-sun-o"></i>':'<i class="fa fa-moon-o"></i>';
+}
+$('themeBtn').onclick=()=>{
+  const dark=!document.documentElement.classList.contains('dark');
+  localStorage.setItem('theme',dark?'dark':'light');
+  applyTheme();
+};
+
+/* ===== 侧边栏导航 ===== */
+function buildNav(){
+  const cats={};
+  CALCULATORS.forEach(c=>{(cats[c.cat]=cats[c.cat]||[]).push(c)});
+  let html='';
+  html+=`<a class="nav-item" data-view="home"><span class="ico"><i class="fa fa-home"></i></span>首页</a>`;
+  for(const cat in cats){
+    html+=`<div class="cat"><div class="cat-title">${cat}</div>`;
+    cats[cat].forEach(c=>{
+      html+=`<a class="nav-item" data-calc="${c.id}"><span class="ico"><i class="fa ${c.icon}"></i></span>${c.name}</a>`;
+    });
+    html+=`</div>`;
+  }
+  html+=`<div class="cat"><div class="cat-title">数据</div>`;
+  html+=`<a class="nav-item" data-view="records"><span class="ico"><i class="fa fa-database"></i></span>计算记录</a>`;
+  html+=`<a class="nav-item" data-view="about"><span class="ico"><i class="fa fa-info-circle"></i></span>关于与声明</a>`;
+  html+=`</div>`;
+  $('navList').innerHTML=html;
+  $('navList').querySelectorAll('.nav-item').forEach(a=>{
+    a.onclick=e=>{
+      e.preventDefault();
+      const calc=a.dataset.calc, view=a.dataset.view;
+      $('navList').querySelectorAll('.nav-item').forEach(x=>x.classList.remove('active'));
+      a.classList.add('active');
+      if(calc) openCalc(calc);
+      else if(view==='records') openRecords();
+      else if(view==='about') openAbout();
+      else openHome();
+      closeSidebar();
+    };
+  });
+}
+function openSidebar(){sidebar.classList.add('open');overlay.classList.add('show')}
+function closeSidebar(){sidebar.classList.remove('open');overlay.classList.remove('show')}
+$('menuBtn').onclick=openSidebar;
+overlay.onclick=closeSidebar;
+$('recordsBtn').onclick=()=>{
+  $('navList').querySelectorAll('.nav-item').forEach(x=>x.classList.remove('active'));
+  openRecords();
+};
+
+/* ===== 首页 ===== */
+function openHome(){
+  $('topbarTitle').textContent='道路工程计算器';
+  const cats={};
+  CALCULATORS.forEach(c=>{(cats[c.cat]=cats[c.cat]||[]).push(c)});
+  let html='';
+  for(const cat in cats){
+    html+=`<div class="card" style="margin-bottom:16px"><div class="card-hd"><h2>${cat}</h2></div><div class="card-bd"><div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">`;
+    cats[cat].forEach(c=>{
+      html+=`<div onclick="openCalc('${c.id}')" style="padding:14px;border:1px solid var(--border);border-radius:12px;cursor:pointer;transition:all .15s" onmouseover="this.style.boxShadow='var(--shadow)'" onmouseout="this.style.boxShadow='none'">
+        <div style="font-size:22px;color:var(--primary);margin-bottom:6px"><i class="fa ${c.icon}"></i></div>
+        <div style="font-weight:600;font-size:14px">${c.name}</div>
+      </div>`;
+    });
+    html+=`</div></div></div>`;
+  }
+  $('content').innerHTML=html;
+}
+
+/* ===== 计算器渲染 ===== */
+function openCalc(id){
+  const c=CALCULATORS.find(x=>x.id===id);
+  if(!c)return;
+  currentCalc=c;
+  $('topbarTitle').textContent=c.name;
+  let fieldsHtml='';
+  c.fields.forEach(f=>{
+    if(f.type==='select'){
+      fieldsHtml+=`<div class="field"><label>${f.label}</label><select id="f_${f.key}">${f.options.map(o=>`<option value="${o[0]}">${o[1]}</option>`).join('')}</select></div>`;
+    }else{
+      const def=f.def!==undefined?`value="${f.def}"`:'';
+      const min=f.min!==undefined?`min="${f.min}"`:'';
+      const max=f.max!==undefined?`max="${f.max}"`:'';
+      const step=f.step?`step="${f.step}"`:'';
+      fieldsHtml+=`<div class="field"><label>${f.label} <span class="unit">${f.unit||''}</span></label><input type="number" id="f_${f.key}" ${def} ${min} ${max} ${step} placeholder="请输入"></div>`;
+    }
+  });
+  $('content').innerHTML=`
+    <div class="card">
+      <div class="card-hd"><h2><i class="fa ${c.icon}" style="color:var(--primary)"></i>${c.name}</h2><span class="tag">${c.cat}</span></div>
+      <div class="card-bd">
+        <div class="desc">${c.desc}</div>
+        <div class="grid-2">${fieldsHtml}</div>
+        <div class="btn-row">
+          <button class="btn btn-primary" id="calcBtn"><i class="fa fa-calculator"></i>计算</button>
+          <button class="btn btn-ghost" id="resetBtn"><i class="fa fa-refresh"></i>重置</button>
+        </div>
+        <div class="result-box" id="resultBox"></div>
+      </div>
+    </div>
+  `;
+  $('calcBtn').onclick=doCalc;
+  $('resetBtn').onclick=()=>{
+    c.fields.forEach(f=>{const el=$('f_'+f.key);if(el)el.value=f.def!==undefined?f.def:'';});
+    $('resultBox').classList.remove('show');
+  };
+}
+
+function doCalc(){
+  const c=currentCalc;
+  const data={};
+  for(const f of c.fields){
+    const el=$('f_'+f.key);
+    if(!el)continue;
+    if(f.type==='select'){data[f.key]=el.value;continue;}
+    const v=el.value;
+    if(v===''){toast('请填写完整输入数据','err');return;}
+    data[f.key]=parseFloat(v);
+  }
+  try{
+    const result=c.calc(data);
+    let html='';
+    for(const k in result){
+      const r=result[k];
+      if(r.cls){
+        html+=`<div class="result-item"><span class="result-label">${k}</span><span class="status-pill ${r.cls}">${r.v}</span></div>`;
+      }else{
+        html+=`<div class="result-item"><span class="result-label">${k}</span><span class="result-val">${r.v}<small> ${r.u||''}</small></span></div>`;
+      }
+    }
+    html+=`<div class="btn-row"><button class="btn btn-ghost" id="exportPdfBtn"><i class="fa fa-file-pdf-o"></i>导出PDF</button><button class="btn btn-success" id="saveBtn"><i class="fa fa-save"></i>保存记录</button></div>`;
+    $('resultBox').innerHTML=html;
+    $('resultBox').classList.add('show');
+    $('exportPdfBtn').onclick=()=>exportPdf(data,result);
+    $('saveBtn').onclick=()=>saveRecord(data,result);
+  }catch(e){
+    toast('计算出错：'+e.message,'err');
+  }
+}
+
+/* ===== 本地记录 ===== */
+const STORE='roadCalcRecords';
+function saveRecord(data,result){
+  const rec={
+    id:Date.now(),
+    calcId:currentCalc.id,
+    calcName:currentCalc.name,
+    cat:currentCalc.cat,
+    icon:currentCalc.icon,
+    time:new Date().toLocaleString('zh-CN'),
+    data,result,
+  };
+  const list=JSON.parse(localStorage.getItem(STORE)||'[]');
+  list.unshift(rec);
+  if(list.length>200)list.length=200;
+  localStorage.setItem(STORE,JSON.stringify(list));
+  toast('已保存到本地记录');
+}
+function getRecords(){return JSON.parse(localStorage.getItem(STORE)||'[]')}
+function openRecords(){
+  $('topbarTitle').textContent='计算记录';
+  const list=getRecords();
+  if(list.length===0){
+    $('content').innerHTML=`<div class="empty"><i class="fa fa-inbox"></i><div>暂无计算记录</div><div style="font-size:12px;margin-top:6px">在计算器中点击"保存记录"即可在此查看</div></div>`;
+    return;
+  }
+  let html=`<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+    <div style="font-size:13px;color:var(--text-2)">共 ${list.length} 条记录（本地存储）</div>
+    <button class="btn btn-ghost" style="padding:8px 14px;font-size:13px" id="clearAll"><i class="fa fa-trash"></i>清空</button>
+  </div>`;
+  list.forEach(r=>{
+    const inputs=Object.entries(r.data).map(([k,v])=>`${k}: ${v}`).join('，');
+    const results=Object.entries(r.result).map(([k,v])=>`${k}: ${v.v}${v.u||''}`).join('；');
+    html+=`<div class="record-item">
+      <div class="record-hd">
+        <div><i class="fa ${r.icon}" style="color:var(--primary);margin-right:6px"></i><span class="record-name">${r.calcName}</span></div>
+        <div class="record-time">${r.time}</div>
+      </div>
+      <div class="record-data"><b>输入：</b>${inputs}<br><b>结果：</b>${results}</div>
+      <div class="record-actions">
+        <button onclick="exportRecordPdf(${r.id})"><i class="fa fa-file-pdf-o"></i>导出PDF</button>
+        <button onclick="reopenCalc('${r.calcId}')"><i class="fa fa-repeat"></i>再次计算</button>
+        <button class="del" onclick="delRecord(${r.id})"><i class="fa fa-trash"></i>删除</button>
+      </div>
+    </div>`;
+  });
+  $('content').innerHTML=html;
+  $('clearAll').onclick=()=>{
+    if(confirm('确定清空所有记录？此操作不可撤销。')){
+      localStorage.removeItem(STORE);
+      openRecords();
+      toast('已清空所有记录');
+    }
+  };
+}
+function delRecord(id){
+  if(!confirm('删除该记录？'))return;
+  let list=getRecords().filter(r=>r.id!==id);
+  localStorage.setItem(STORE,JSON.stringify(list));
+  openRecords();
+  toast('已删除');
+}
+function reopenCalc(id){openCalc(id)}
+function exportRecordPdf(id){
+  const r=getRecords().find(x=>x.id===id);
+  if(r)exportPdf(r.data,r.result,r);
+}
+
+/* ===== PDF 导出 ===== */
+const DISCLAIMER=`声明与免责：
+1. 本计算器仅供道路与桥梁工程技术专业学习、教学及工程现场快速参考使用，不构成正式检测报告。
+2. 计算结果依据公开试验方法与常规公式整理，实际工程应以现行国家标准、行业规范及法定检测机构出具的报告为准。
+3. 所有数据均保存在使用者本地浏览器(localStorage)中，不上传任何服务器，请自行做好数据备份。
+4. 因输入数据错误或公式理解偏差导致的结果偏差，由使用者自行承担。
+5. 引用开源库：jsPDF (MIT License)、Font Awesome (CC BY 4.0)。`;
+
+function exportPdf(data,result,record){
+  const {jsPDF}=window.jspdf;
+  const doc=new jsPDF({unit:'pt',format:'a4'});
+  const c=currentCalc;
+  const name=record?record.calcName:c.name;
+  const cat=record?record.cat:c.cat;
+  const time=record?record.time:new Date().toLocaleString('zh-CN');
+
+  // 标题
+  doc.setFillColor(37,99,235);
+  doc.rect(0,0,doc.internal.pageSize.getWidth(),70,'F');
+  doc.setTextColor(255,255,255);
+  doc.setFont('helvetica','bold');
+  doc.setFontSize(18);
+  doc.text('Road Engineering Calculator',40,32);
+  doc.setFontSize(13);
+  doc.text(name+'  -  '+cat,40,54);
+
+  let y=100;
+  doc.setTextColor(30,41,59);
+  doc.setFont('helvetica','bold');
+  doc.setFontSize(12);
+  doc.text('Calculation Report / 计算报告',40,y); y+=8;
+  doc.setFont('helvetica','normal');
+  doc.setFontSize(9);
+  doc.setTextColor(100,116,139);
+  doc.text('Generated at / 生成时间: '+time,40,y); y+=20;
+
+  // 输入参数
+  doc.setTextColor(30,41,59);
+  doc.setFont('helvetica','bold');
+  doc.setFontSize(11);
+  doc.text('Input Parameters / 输入参数',40,y); y+=16;
+  doc.setFont('helvetica','normal');
+  doc.setFontSize(10);
+  doc.setDrawColor(229,233,242);
+  doc.line(40,y,doc.internal.pageSize.getWidth()-40,y); y+=10;
+  Object.entries(data).forEach(([k,v])=>{
+    if(y>720){doc.addPage();y=60;}
+    doc.setTextColor(100,116,139);
+    doc.text(k,60,y);
+    doc.setTextColor(30,41,59);
+    doc.text(String(v),300,y);
+    y+=18;
+  });
+
+  y+=10;
+  doc.setTextColor(30,41,59);
+  doc.setFont('helvetica','bold');
+  doc.setFontSize(11);
+  doc.text('Results / 计算结果',40,y); y+=16;
+  doc.setFont('helvetica','normal');
+  doc.setFontSize(10);
+  doc.line(40,y,doc.internal.pageSize.getWidth()-40,y); y+=10;
+  Object.entries(result).forEach(([k,v])=>{
+    if(y>720){doc.addPage();y=60;}
+    doc.setTextColor(100,116,139);
+    doc.text(k,60,y);
+    doc.setTextColor(37,99,235);
+    doc.setFont('helvetica','bold');
+    doc.text(`${v.v} ${v.u||''}`,300,y);
+    doc.setFont('helvetica','normal');
+    y+=18;
+  });
+
+  // 声明
+  y+=20;
+  doc.setTextColor(100,116,139);
+  doc.setFont('helvetica','bold');
+  doc.setFontSize(10);
+  doc.text('Disclaimer / 声明',40,y); y+=14;
+  doc.setFont('helvetica','normal');
+  doc.setFontSize(8.5);
+  const lines=doc.splitTextToSize(DISCLAIMER,doc.internal.pageSize.getWidth()-80);
+  lines.forEach(l=>{
+    if(y>760){doc.addPage();y=60;}
+    doc.text(l,40,y); y+=12;
+  });
+
+  doc.save(`calc_${name}_${Date.now()}.pdf`);
+  toast('PDF 已导出');
+}
+
+/* ===== 关于 ===== */
+function openAbout(){
+  $('topbarTitle').textContent='关于与声明';
+  $('content').innerHTML=`
+    <div class="card"><div class="card-hd"><h2><i class="fa fa-info-circle" style="color:var(--primary)"></i>关于本应用</h2></div><div class="card-bd">
+      <p style="margin-bottom:10px"><b>道路工程计算器 · 移动版</b></p>
+      <p style="font-size:13px;color:var(--text-2);line-height:1.8">面向道路与桥梁工程技术专业的纯前端计算工具集合，支持离线使用、本地记录保存与PDF导出。</p>
+    </div></div>
+    <div class="card" style="margin-top:16px"><div class="card-hd"><h2><i class="fa fa-exclamation-triangle" style="color:var(--warn)"></i>声明与免责</h2></div><div class="card-bd">
+      <pre style="font-family:inherit;font-size:13px;color:var(--text-2);line-height:1.8;white-space:pre-wrap">${DISCLAIMER}</pre>
+    </div></div>
+    <div class="card" style="margin-top:16px"><div class="card-hd"><h2><i class="fa fa-book" style="color:var(--success)"></i>参考资料</h2></div><div class="card-bd">
+      <ul style="font-size:13px;color:var(--text-2);line-height:1.8;padding-left:20px">
+        <li>水泥细度检验方法（筛析法，80μm/45μm 方孔筛）</li>
+        <li>水泥标准稠度用水量、凝结时间、安定性检验方法</li>
+        <li>水泥胶砂强度检验方法（抗折、抗压强度试验）</li>
+        <li>混凝土拌合物稠度试验方法（坍落度法）</li>
+        <li>砂子堆积密度与孔隙率试验、砂筛分试验</li>
+        <li>石子针片状颗粒含量试验</li>
+        <li>混凝土配合比设计（水灰比、灰砂比参数）</li>
+      </ul>
+    </div></div>
+  `;
+}
+
+/* ===== Toast ===== */
+function toast(msg,type){
+  const t=$('toast');
+  t.textContent=msg;
+  t.classList.add('show');
+  clearTimeout(t._t);
+  t._t=setTimeout(()=>t.classList.remove('show'),2200);
+}
+
+/* ===== 初始化 ===== */
+applyTheme();
+buildNav();
+openHome();
+</script>
+</body>
+</html>
